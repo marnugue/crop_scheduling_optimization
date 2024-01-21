@@ -79,14 +79,9 @@ class EpsilonConstraintAugment:
         return res
 
     @staticmethod
-    def __solve_instance(model: Model, timelimit=10, solver=solver):
-        solver = SolverFactory('mindtpy')
-        # solver.options['seconds'] = timelimit
-        status = solver.solve(model, mip_solver='cbc',
-                              nlp_solver='ipopt', tee=True,
-                              strategy='ECP',
-                              time_limit=timelimit,
-                              iteration_limit=10)
+    def __solve_instance(model: Model, solver=solver):
+        solver = SolverFactory('cbc')
+        status = solver.solve(model)
         return status
 
     @staticmethod
