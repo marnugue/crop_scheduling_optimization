@@ -1,5 +1,7 @@
 import pyomo.environ as pyo
 import logging
+import pandas as pd
+import os
 
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 from pyomo.util.infeasible import log_infeasible_constraints
@@ -15,7 +17,7 @@ class PYCropEngine:
     def _build_parameters(self):
         self.model.VEGETABLES = pyo.Set(initialize=["H1", "H2", "H3"])
         self.model.X = pyo.RangeSet(0, 3)
-        self.model.TIME = pyo.RangeSet(0, 6)
+        self.model.TIME = pyo.RangeSet(0, 30)
         self.model.growth = pyo.Param(
             self.model.VEGETABLES, initialize={"H1": 5, "H2": 3, "H3": 2}
         )
@@ -94,7 +96,9 @@ class PYCropEngine:
             rule=self._exp_diff_vegetables_production,
         )
 
-    def execute(self, time_limit: int = 30, solver: str = "scip", **sl_parameters):
+    def execute(self, time_limit: int = 30,
+                solution_path: str = "./",
+                solver: str = "scip", **sl_parameters):
         self.model = pyo.ConcreteModel()
 
         self._build_parameters()
@@ -114,6 +118,7 @@ class PYCropEngine:
                     == pyo.TerminationCondition.optimal
                 ):
                     logger.info("Solution is optimal!")
+                self._build_solution(solution_path)
             else:
                 log_infeasible_constraints(
                     self.model, log_expression=True, log_variables=True
@@ -228,5 +233,18 @@ class PYCropEngine:
 
         self.model.production = pyo.Objective(expr=cost_total, sense=pyo.maximize)
 
-    def _build_solution(self):
-        pass
+    def _build_solution(self, solution_path: str):
+        scheduling_solution = []
+        
+        for x in self.model.X:
+            for h in self.model.VEGETABLES:
+                for t in self.model.TIME:
+                    value = self.model.var_crop_scheduling[x, h, t].value
+                    scheduling_solution.append(tuple((f'P{x}', h, t, int(value))))
+        
+        sol_df = pd.DataFrame(scheduling_solution,
+                              columns=['Position', 'Vegetable', 'Time', 'Value']).pivot(
+            index='Time', columns=['Position', 'Vegetable'], values='Value'
+        )
+        
+        sol_df.to_csv(os.path.join(solution_path, "solution.csv"))
