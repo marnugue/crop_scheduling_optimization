@@ -18,6 +18,7 @@ class PYCropEngine:
         self.model.VEGETABLES = pyo.Set(initialize=["H1", "H2", "H3"])
         self.model.X = pyo.RangeSet(0, 3)
         self.model.TIME = pyo.RangeSet(0, 30)
+        self.model.forbidden_seed_times = pyo.Set(initialize=[15,16,29])
         self.model.growth = pyo.Param(
             self.model.VEGETABLES, initialize={"H1": 5, "H2": 3, "H3": 2}
         )
@@ -69,6 +70,10 @@ class PYCropEngine:
             self.model.VEGETABLES,
             self.model.TIME,
             rule=self._constraint_min_growth,
+        )
+        
+        self.model.constraint_crop_time = pyo.ConstraintList(
+            rule=self._constraint_crop_time
         )
 
     def _build_expressions(self):
@@ -148,7 +153,7 @@ class PYCropEngine:
 
     def _exp_diff_vegetables_production(self, model, h1, h2):
         return abs(model.exp_vegetable_production[h1] - model.exp_vegetable_production[h2])
-
+    
     # Constraints
 
     def _constraint_max_vegetables(self, model, x, t):
@@ -215,6 +220,13 @@ class PYCropEngine:
                         yield max_value <= s1 + s2
 
                         # return c1, c2, c3
+    
+    def _constraint_crop_time(self, model):
+        
+        for x in model.X:
+            for h in model.VEGETABLES:
+                for t in model.forbidden_seed_times:
+                    yield model.exp_crop_bin[x, h, t] == 0
 
     def _build_objectives(self):
         production = sum(
